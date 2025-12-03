@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>App Đăng ký & Điểm danh</title>
+  <style>
+    :root{ --bg:#f2f5f9; --card:#fff; --primary:#0066ff; --muted:#6b7280 }
+    *{box-sizing:border-box}
+    body{font-family:Inter, 'Segoe UI', Roboto, sans-serif; background:var(--bg); margin:0; padding:18px}
+    .container{max-width:960px;margin:0 auto}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    h1{font-size:20px;margin:0}
+
+    /* Grid responsive */
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
+    @media (max-width:820px){ .grid{grid-template-columns:1fr} }
+
+    .box{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+    .form-row{margin-bottom:12px}
+    label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+    input,select,button{width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ef}
+    input:focus,select:focus{outline:none;box-shadow:0 0 0 3px rgba(0,102,255,0.08)}
+    button{background:var(--primary);color:#fff;border:0;cursor:pointer}
+    small.note{color:var(--muted);display:block;margin-top:8px}
+
+    /* Attendance list */
+    .att-list{max-height:280px;overflow:auto;padding:6px;border-radius:8px;border:1px dashed #eef2ff}
+    .att-list li{padding:8px;border-bottom:1px solid #f3f6fa;font-size:13px}
+
+    /* Mobile footer actions */
+    .mobile-actions{display:none}
+    @media (max-width:480px){
+      header{flex-direction:column;align-items:flex-start;gap:8px}
+      .mobile-actions{display:flex;gap:8px;margin-top:8px}
+      .grid{gap:10px}
+    }
+
+    /* Small helpers */
+    .row{display:flex;gap:8px}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#f4f6ff;color:#123}
+    .muted{color:var(--muted)}
+
+    /* admin table */
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #f3f6fa;text-align:left;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Hệ thống đăng ký &amp; điểm danh</h1>
+      <div class="muted">Chạy trên trình duyệt &amp; responsive (mobile-ready)</div>
+      <div class="mobile-actions">
+        <button onclick="togglePanel('login')">Đăng nhập</button>
+        <button onclick="togglePanel('register')">Đăng ký</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left: main actions -->
+      <div>
+        <div id="registerBox" class="box">
+          <h2>Đăng ký tài khoản</h2>
+          <div class="form-row"><label for="regUser">Tên người dùng</label><input id="regUser" placeholder="vd: nguyenvan" /></div>
+          <div class="form-row"><label for="regPass">Mật khẩu</label><input id="regPass" type="password" placeholder="Mật khẩu" /></div>
+          <div class="form-row"><label for="regRole">Vai trò</label>
+            <select id="regRole"><option value="user">Người dùng</option><option value="admin">Quản trị viên</option></select>
+          </div>
+          <div class="form-row"><button onclick="register()">Đăng ký</button></div>
+          <p id="regMsg" class="muted"></p>
+          <small class="note">Lưu ý: chế độ demo dùng localStorage. Chọn backend để lưu trên server.</small>
+        </div>
+
+        <div id="loginBox" class="box" style="margin-top:12px">
+          <h2>Đăng nhập</h2>
+          <div class="form-row"><label for="logUser">Tên người dùng</label><input id="logUser" placeholder="Tên người dùng" /></div>
+          <div class="form-row"><label for="logPass">Mật khẩu</label><input id="logPass" type="password" placeholder="Mật khẩu" /></div>
+          <div class="form-row"><button onclick="login()">Đăng nhập</button></div>
+          <p id="logMsg" class="muted"></p>
+        </div>
+
+        <div id="attendanceBox" class="box" style="margin-top:12px;display:none">
+          <h2>Điểm danh</h2>
+          <p id="welcome"></p>
+          <div class="row">
+            <button onclick="diemDanh()">Điểm danh ngay</button>
+            <button onclick="viewMyAttendance()" style="background:#10b981">Xem lịch sử</button>
+          </div>
+          <p id="attMsg" class="muted"></p>
+          <ul id="myList" class="att-list" style="margin-top:12px"></ul>
+        </div>
+      </div>
+
+      <!-- Right: admin & settings -->
+      <aside>
+        <div class="box">
+          <h3>Cài đặt lưu trữ</h3>
+          <select id="backendSelect" onchange="setBackend()">
+            <option value="local">Local (demo)</option>
+            <option value="node">Node.js / REST API</option>
+            <option value="firebase">Firebase (Firestore)</option>
+            <option value="php">PHP / MySQL</option>
+          </select>
+          <small class="note">Chọn 'Node.js' hoặc 'Firebase' nếu bạn muốn dùng server thật.</small>
+        </div>
+
+        <div id="adminBox" class="box" style="margin-top:12px;display:none">
+          <h3>Quản lý (Admin)</h3>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <button onclick="fetchAll()">Tải danh sách</button>
+            <button onclick="exportCSV()" style="background:#111827">Xuất CSV</button>
+          </div>
+          <div id="adminContent">
+            <table id="adminTable"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Điểm danh</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div class="box" style="margin-top:12px">
+          <h3>Hướng dẫn nhanh backend</h3>
+          <ul>
+            <li><b>Node.js</b>: tạo REST API /users (POST), /login (POST), /attendance (POST/GET). Frontend gọi fetch('/api/...').</li>
+            <li><b>Firebase</b>: lưu vào Firestore <code>users/{uid}/attendance</code>. Dùng Firebase SDK trên frontend.</li>
+            <li><b>PHP</b>: tạo API tương tự với endpoints và lưu MySQL (users, attendance).</li>
+          </ul>
+          <small class="note">Nếu muốn, mình sẽ tạo sẵn code server (Node/ PHP) hoặc cấu hình Firebase cho bạn.</small>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    /* ---------- State & helpers ---------- */
+    let backend = localStorage.getItem('dd_backend') || 'local';
+    document.getElementById('backendSelect').value = backend;
+
+    function setBackend(){ backend = document.getElementById('backendSelect').value; localStorage.setItem('dd_backend', backend); alert('Đã chuyển backend sang: '+backend); }
+
+    function togglePanel(id){ if(id==='login') window.scrollTo({top:document.getElementById('loginBox').offsetTop, behavior:'smooth'}); else window.scrollTo({top:document.getElementById('registerBox').offsetTop, behavior:'smooth'}); }
+
+    function showAdminIfNeeded(user){ if(user && user.role === 'admin') document.getElementById('adminBox').style.display='block'; }
+
+    function apiFetch(path, opts){
+      // wrapper: in demo mode use localStorage, otherwise call remote API
+      if(backend === 'local') return Promise.resolve({ok:true, json:()=>Promise.resolve(dummyBackend(path, opts))});
+      if(backend === 'node' || backend === 'php'){
+        // Example: expects a server at /api
+        return fetch('/api'+path, opts);
+      }
+      if(backend === 'firebase'){
+        // Firebase handled separately (not via REST here). We'll throw so developer knows to use SDK.
+        return Promise.reject(new Error('Use Firebase SDK for Firestore operations'));
+      }
+    }
+
+    /* ---------- Demo local backend (keeps same structure as server would) ---------- */
+    function dummyBackend(path, opts){
+      let store = JSON.parse(localStorage.getItem('users')||'{}');
+      if(path === '/register'){
+        const body = JSON.parse(opts.body);
+        if(store[body.user]) return {status:400, message:'exists'};
+        store[body.user] = {pass:body.pass, role:body.role, attendance:[]};
+        localStorage.setItem('users', JSON.stringify(store));
+        return {status:200, ok:true};
+      }
+      if(path === '/login'){
+        const body = JSON.parse(opts.body);
+        if(!store[body.user] || store[body.user].pass !== body.pass) return {status:401};
+        return {status:200, user:{user:body.user, role:store[body.user].role}};
+      }
+      if(path === '/attendance'){ // POST add, GET list
+        if(opts.method === 'POST'){
+          const body = JSON.parse(opts.body);
+          store[body.user].attendance.push(new Date().toLocaleString());
+          localStorage.setItem('users', JSON.stringify(store));
+          return {status:200};
+        }
+        // GET
+        return {status:200, data:store};
+      }
+      return {status:404};
+    }
+
+    /* ---------- Frontend actions using apiFetch ---------- */
+    async function register(){
+      const u = document.getElementById('regUser').value.trim();
+      const p = document.getElementById('regPass').value;
+      const role = document.getElementById('regRole').value;
+      if(!u||!p) return document.getElementById('regMsg').textContent='Vui lòng nhập đủ thông tin';
+
+      try{
+        const r = await apiFetch('/register', {method:'POST', body:JSON.stringify({user:u,pass:p,role})});
+        const j = await r.json();
+        if(r.ok || j.status===200) document.getElementById('regMsg').textContent='Đăng ký thành công!';
+        else document.getElementById('regMsg').textContent='Lỗi: ' + (j.message||'Không xác định');
+      }catch(e){ document.getElementById('regMsg').textContent='Lỗi kết nối: '+e.message }
+    }
+
+    async function login(){
+      const u = document.getElementById('logUser').value.trim();
+      const p = document.getElementById('logPass').value;
+      if(!u||!p) return document.getElementById('logMsg').textContent='Vui lòng nhập đủ thông tin';
+      try{
+        const r = await apiFetch('/login', {method:'POST', body:JSON.stringify({user:u,pass:p})});
+        const j = await r.json();
+        if(r.ok || j.status===200){
+          window.currentUser = j.user || j.user;
+          document.getElementById('logMsg').textContent='Đăng nhập thành công';
+          document.getElementById('attendanceBox').style.display='block';
+          document.getElementById('welcome').textContent='Xin chào '+(j.user.user || u) + ' — ' + (j.user.role || (j.user && j.user.role) || 'user');
+          showAdminIfNeeded(j.user || j.user);
+          // load my attendance
+          viewMyAttendance();
+        } else document.getElementById('logMsg').textContent='Sai tài khoản hoặc mật khẩu';
+      }catch(e){ document.getElementById('logMsg').textContent='Lỗi: '+e.message }
+    }
+
+    async function diemDanh(){
+      if(!window.currentUser) return document.getElementById('attMsg').textContent='Bạn chưa đăng nhập';
+      try{
+        const r = await apiFetch('/attendance', {method:'POST', body:JSON.stringify({user:window.currentUser.user||window.currentUser})});
+        if(r.ok) document.getElementById('attMsg').textContent='Đã điểm danh';
+        else document.getElementById('attMsg').textContent='Lỗi khi điểm danh';
+        viewMyAttendance();
+      }catch(e){ document.getElementById('attMsg').textContent='Lỗi: '+e.message }
+    }
+
+    async function viewMyAttendance(){
+      try{
+        const r = await apiFetch('/attendance', {method:'GET'});
+        const j = await r.json();
+        const users = j.data || j;
+        const me = users[(window.currentUser && (window.currentUser.user||window.currentUser))];
+        const ul = document.getElementById('myList'); ul.innerHTML='';
+        if(me && me.attendance){ me.attendance.forEach(t=>{ const li=document.createElement('li'); li.textContent=t; ul.appendChild(li) }) }
+      }catch(e){ console.warn(e) }
+    }
+
+    async function fetchAll(){
+      try{
+        const r = await apiFetch('/attendance',{method:'GET'});
+        const j = await r.json();
+        const users = j.data || j;
+        const tbody = document.querySelector('#adminTable tbody'); tbody.innerHTML='';
+        for(const u in users){ const tr=document.createElement('tr'); const td1=document.createElement('td'); td1.textContent=u; const td2=document.createElement('td'); td2.textContent=users[u].role||'user'; const td3=document.createElement('td'); td3.textContent=(users[u].attendance||[]).join('
+'); tr.append(td1,td2,td3); tbody.appendChild(tr) }
+      }catch(e){ alert('Không lấy được dữ liệu: '+e.message) }
+    }
+
+    function exportCSV(){
+      // simple CSV exporter for admin
+      const rows=[]; const r=document.querySelectorAll('#adminTable tbody tr');
+      r.forEach(tr=>{ const cols=tr.querySelectorAll('td'); rows.push([cols[0].textContent,cols[1].textContent,'"'+cols[2].textContent.replace(/
+/g,' | ')+'"']) });
+      const csv = rows.map(r=>r.join(',')).join('
+');
+      const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='attendance.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    // Bootstrap demo: create an admin user if none exists
+    (function initDemo(){
+      const users = JSON.parse(localStorage.getItem('users')||'{}');
+      if(!users['admin']){ users['admin']={pass:'admin123',role:'admin',attendance:[]}; localStorage.setItem('users',JSON.stringify(users)); }
+    })();
+  </script>
+
+  <!--
+    ---------- Ghi chú về backend (mô tả ngắn) ----------
+    Nếu bạn muốn mình tạo code server, mình có thể:
+      1) Tạo Node.js + Express API (routes: /api/register, /api/login, /api/attendance). Kèm hướng dẫn setup MySQL hoặc MongoDB.
+      2) Tạo PHP (Laravel hoặc plain PHP) với MySQL.
+      3) Hướng dẫn cấu hình Firebase Firestore + rules + mẫu code frontend sử dụng Firebase SDK.
+
+    Chọn 1 trong 3 (node / php / firebase) và mình sẽ tạo mã nguồn server + hướng dẫn deploy.
+  -->
+</body>
+</html>
