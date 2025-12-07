@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hệ Thống Điểm Danh</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+    height: 100vh;
+    display: flex; justify-content: center; align-items: center;
+    margin: 0;
+  }
+  .box {
+    background: white; padding: 30px; border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    width: 320px; text-align: center;
+  }
+  input {
+    width: 100%; padding: 12px; margin: 10px 0;
+    border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;
+  }
+  button {
+    width: 100%; padding: 12px; border: none; border-radius: 5px;
+    cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px;
+  }
+  .btn-blue { background: #007bff; color: white; }
+  .btn-green { background: #28a745; color: white; }
+  
+  /* Nút điểm danh to */
+  .big-btn {
+    width: 180px; height: 180px; border-radius: 50%;
+    background: #ff5722; color: white; font-size: 22px;
+    box-shadow: 0 5px 15px rgba(255,87,34,0.4);
+    margin: 20px auto; display: flex; align-items: center; justify-content: center;
+  }
+  .big-btn:active { transform: scale(0.95); }
+  
+  .link { color: #007bff; cursor: pointer; margin-top: 15px; display: block; text-decoration: underline; }
+  .hidden { display: none; }
+  .mess { margin-top: 10px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+  <div id="view-login" class="box">
+    <h2>Đăng Nhập</h2>
+    <input type="text" id="log-user" placeholder="Tên đăng nhập">
+    <input type="password" id="log-pass" placeholder="Mật khẩu">
+    <button class="btn-blue" onclick="processLogin()">Đăng Nhập</button>
+    <div id="msg-login" class="mess"></div>
+    <span class="link" onclick="switchView('register')">Chưa có tài khoản? Đăng ký</span>
+  </div>
+
+  <div id="view-register" class="box hidden">
+    <h2>Đăng Ký</h2>
+    <input type="text" id="reg-name" placeholder="Họ tên của bạn">
+    <input type="text" id="reg-user" placeholder="Tên đăng nhập mới">
+    <input type="password" id="reg-pass" placeholder="Mật khẩu">
+    <button class="btn-green" onclick="processRegister()">Đăng Ký</button>
+    <div id="msg-reg" class="mess"></div>
+    <span class="link" onclick="switchView('login')">Quay lại đăng nhập</span>
+  </div>
+
+  <div id="view-main" class="box hidden">
+    <h2>Xin chào, <span id="user-name"></span>!</h2>
+    <p>Nhấn nút dưới để điểm danh</p>
+    
+    <button class="big-btn" onclick="processCheckIn()">ĐIỂM DANH</button>
+    
+    <div id="msg-main" class="mess"></div>
+    <span class="link" onclick="logout()" style="color:red;">Đăng xuất</span>
+  </div>
+
+<script>
+  // =======================================================
+  // QUAN TRỌNG: DÁN LINK CỦA BẠN VÀO GIỮA HAI DẤU NHÁY DƯỚI ĐÂY
+  // =======================================================
+  const API_URL = "https://script.google.com/macros/s/AKfycbzIrjI3kixZ5OhzXUzzNvvghsp70NJr48b28vXq91BdzZJG4t3hqZWIZadC4CjqBHzo/exec"; 
+  // Ví dụ: const API_URL = "https://script.google.com/macros/s/AKfyc.../exec";
+
+
+  // --- Logic chuyển cảnh ---
+  function switchView(view) {
+    document.getElementById('view-login').classList.add('hidden');
+    document.getElementById('view-register').classList.add('hidden');
+    document.getElementById('view-main').classList.add('hidden');
+    
+    if(view === 'login') document.getElementById('view-login').classList.remove('hidden');
+    if(view === 'register') document.getElementById('view-register').classList.remove('hidden');
+    if(view === 'main') document.getElementById('view-main').classList.remove('hidden');
+    
+    // Xóa thông báo cũ
+    document.getElementById('msg-login').innerText = '';
+    document.getElementById('msg-reg').innerText = '';
+    document.getElementById('msg-main').innerText = '';
+  }
+
+  // --- Kiểm tra xem đã đăng nhập chưa ---
+  const savedUser = JSON.parse(localStorage.getItem('user_info'));
+  if (savedUser) {
+    document.getElementById('user-name').innerText = savedUser.fullname;
+    switchView('main');
+  }
+
+  // --- Hàm gọi Server ---
+  async function callServer(data, msgId) {
+    const msg = document.getElementById(msgId);
+    msg.innerText = "Đang xử lý...";
+    msg.style.color = "blue";
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify(data) // Gửi dạng JSON text để tránh lỗi CORS
+      });
+      const result = await res.json();
+      
+      if(result.success) {
+        msg.innerText = result.message;
+        msg.style.color = "green";
+      } else {
+        msg.innerText = result.message;
+        msg.style.color = "red";
+      }
+      return result;
+    } catch (err) {
+      msg.innerText = "Lỗi kết nối!"; 
+      console.log(err);
+      return { success: false };
+    }
+  }
+
+  // --- Chức năng Đăng ký ---
+  async function processRegister() {
+    const fullname = document.getElementById('reg-name').value;
+    const username = document.getElementById('reg-user').value;
+    const password = document.getElementById('reg-pass').value;
+    
+    if(!fullname || !username || !password) return alert("Nhập đủ thông tin!");
+
+    const res = await callServer({ action: 'register', fullname, username, password }, 'msg-reg');
+    if(res.success) {
+      setTimeout(() => switchView('login'), 1500);
+    }
+  }
+
+  // --- Chức năng Đăng nhập ---
+  async function processLogin() {
+    const username = document.getElementById('log-user').value;
+    const password = document.getElementById('log-pass').value;
+
+    const res = await callServer({ action: 'login', username, password }, 'msg-login');
+    if(res.success) {
+      localStorage.setItem('user_info', JSON.stringify(res));
+      document.getElementById('user-name').innerText = res.fullname;
+      setTimeout(() => switchView('main'), 1000);
+    }
+  }
+
+  // --- Chức năng Điểm danh ---
+  async function processCheckIn() {
+    const user = JSON.parse(localStorage.getItem('user_info'));
+    const res = await callServer({ 
+      action: 'checkin', 
+      username: user.username, 
+      fullname: user.fullname 
+    }, 'msg-main');
+  }
+
+  function logout() {
+    localStorage.removeItem('user_info');
+    location.reload();
+  }
+</script>
+</body>
+</html>
